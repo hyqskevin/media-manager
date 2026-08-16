@@ -3,6 +3,26 @@
 > 媒体矩阵（media-matrix）账号运营管理台：基于 OpenCLI 浏览器自动化，跨平台（小红书/微博等）养号，支持主动浏览、点赞收藏、收藏夹管理。
 > 本仓库从 `xhs-info-crawl` 继承而来，复用了其 OpenCLI 适配、Celery 任务、FastAPI + Vue3 管理台基建。
 
+## v0 范围（2026-08-16 确认）
+
+本仓库 **v0 只落地三块**：
+
+1. **平台账号管理** — 多平台账号 CRUD + 登录态 + Chrome 实例隔离
+2. **自动养号** — 主动浏览 feed + 点赞 + 收藏（手动 / 定时触发）
+3. **收藏夹** — 各平台收藏夹列表入库 + 快照历史对比
+
+**不在 v0 范围（v1 再做）：** 工作流 / 多平台发布 / 数据中心 / 素材库 / 内容日历 / 规则引擎 / 自研 Chrome 扩展。
+
+详细设计与数据模型见：
+- [docs/SPEC-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/SPEC-v0.md) — v0 精简规格
+- [docs/overview-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/overview-v0.md) — v0 总览
+- [docs/api-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/api-v0.md) — v0 API
+- [docs/database-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/database-v0.md) — v0 数据表
+- [docs/browser-bridge-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/browser-bridge-v0.md) — v0 浏览器自动化
+- [docs/ui-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/ui-v0.md) — v0 UI
+
+> 完整基线（继承自 xhs-info-crawl + 上级 Operate 设计，含工作流 / 发布 / 数据中心等 v1 模块）见 [`docs/overview.md`](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/overview.md) 及同目录其他 `*-design.md`。
+
 ## 核心能力
 
 - **多平台账号管理**：统一的平台/账号/登录态管理，支持小红书、微博等多平台扩展
