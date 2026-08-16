@@ -1,0 +1,23 @@
+/* 表格操作列全局样式：按钮不换行、移动端纵向堆叠 */
+.action-column {
+  white-space: nowrap;
+}
+
+.action-column .el-button {
+  white-space: nowrap;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.action-column .el-dropdown {
+  margin-left: 4px;
+}
+
+@media (max-width: 768px) {
+  .action-column .el-button {
+    display: block;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}

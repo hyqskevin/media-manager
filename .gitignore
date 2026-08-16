@@ -1,0 +1,61 @@
+.DS_Store
+.env
+.venv/
+.trae/
+.vite/
+node_modules/
+backend/.venv/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+launcher/ui/node_modules/
+launcher/ui/dist/
+*.tsbuildinfo
+data/*
+!data/.gitkeep
+control/
+xhs_images/
+__pycache__/
+*.py[cod]
+*.log
+
+# TDD 过程文档(specs/plans/qa 不进仓库,本地保留)
+docs/superpowers/
+
+# TDD 过程测试案例文档和脚本(根目录 tests/,非 backend/tests)
+tests/
+
+# 本地脏数据/测试产物
+data/posters/ocr_crops/
+.uploads/
+backend/data/
+
+# 文档截图(临时测试用)
+docs/image*.png
+
+# AGENTS.md 声明 docs/TODO.md 是 agent 动态维护的待办入口,持续授权下频繁变更,不入库
+docs/TODO.md
+
+# 测试脚本不提交
+scripts/test-*.sh
+
+# 非生产文件(设计文档/开发工具,不进仓库)
+SPEC.md
+RELEASE_NOTES.md
+Makefile
+
+# 测试代码不提交(和生产运行无关)
+backend/tests/
+backend/tests/fixtures/
+launcher/tests/
+frontend/src/**/*.spec.ts
+frontend/e2e/
+launcher/ui/src/**/*.spec.ts
+launcher/ui/src/__tests__/
+
+# CI 测试工作流(不跑测试)
+.github/workflows/ci.yml

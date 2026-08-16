@@ -1,0 +1,4 @@
+# 启动器 Python 依赖(独立于后端)
+pywebview>=5.3,<6
+fastapi>=0.115,<1
+httpx>=0.28,<1

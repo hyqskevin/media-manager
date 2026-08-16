@@ -1,0 +1,36 @@
+# 源码 zip 排除规则(git archive --format=zip)
+# 开发产物不进源码包
+.venv/ export-ignore
+backend/.venv/ export-ignore
+node_modules/ export-ignore
+frontend/node_modules/ export-ignore
+launcher/ui/node_modules/ export-ignore
+dist/ export-ignore
+frontend/dist/ export-ignore
+launcher/ui/dist/ export-ignore
+
+# 运行数据
+data/ export-ignore
+*.db export-ignore
+data/images/ export-ignore
+data/exports/ export-ignore
+data/backups/ export-ignore
+data/logs/ export-ignore
+data/paddlex/ export-ignore
+data/huggingface/ export-ignore
+data/celery/ export-ignore
+data/tmp/ export-ignore
+data/archive/ export-ignore
+
+# 敏感文件
+.env export-ignore
+
+# IDE 和系统文件
+.trae/ export-ignore
+.DS_Store export-ignore
+__pycache__/ export-ignore
+*.pyc export-ignore
+*.log export-ignore
+.pytest_cache/ export-ignore
+backend/.pytest_cache/ export-ignore
+*.tsbuildinfo export-ignore
