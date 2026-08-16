@@ -1,1 +1,1 @@
-"""Core application configuration and infrastructure."""
+"""核心配置 / 数据库 / 安全基础设施。

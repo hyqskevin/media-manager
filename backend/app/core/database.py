@@ -1,42 +1,37 @@
-from collections.abc import Generator
+"""SQLAlchemy 数据库引擎 + Session 工厂。"""
+from collections.abc import Iterator
+from pathlib import Path
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
+from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.core.config import Settings, get_settings
+from app.core.config import get_settings
+
+settings = get_settings()
+
+# 确保 SQLite data 目录存在
+if settings.database_url.startswith("sqlite:///"):
+    db_path = Path(settings.database_url.replace("sqlite:///", ""))
+    db_path.parent.mkdir(parents=True, exist_ok=True)
 
 
 class Base(DeclarativeBase):
-    pass
+    """SQLAlchemy declarative base。所有模型继承自此类。"""
 
 
-def create_database_engine(settings: Settings) -> Engine:
-    connect_args = {"check_same_thread": False} if settings.effective_database_url.startswith("sqlite") else {}
-    return create_engine(settings.effective_database_url, connect_args=connect_args)
+engine = create_engine(
+    settings.database_url,
+    echo=False,
+    connect_args={"check_same_thread": False} if settings.database_url.startswith("sqlite") else {},
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-settings = get_settings()
-engine = create_database_engine(settings)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-
-
-def init_database(app_settings: Settings | None = None) -> None:
-    from app.models import activity, audit, blogger_city, blogger_group, config, duplicate, group, keyword_group, note, poster, report, schedule, search_usage, task, user, xhs_account  # noqa: F401
-
-    selected_settings = app_settings or settings
-    selected_settings.ensure_runtime_directories()
-    selected_engine = engine if app_settings is None else create_database_engine(selected_settings)
-    with selected_engine.begin() as connection:
-        connection.execute(text("SELECT 1"))
-    Base.metadata.create_all(selected_engine)
-    if app_settings is not None:
-        selected_engine.dispose()
-
-
-def get_db() -> Generator[Session, None, None]:
-    database = SessionLocal()
+def get_db() -> Iterator[Session]:
+    """FastAPI 依赖注入：提供 Session 并自动关闭。"""
+    db = SessionLocal()
     try:
-        yield database
+        yield db
     finally:
-        database.close()
+        db.close()

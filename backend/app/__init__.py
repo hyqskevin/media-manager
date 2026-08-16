@@ -1,1 +1,1 @@
-"""XHS activity crawler backend."""
+"""media-manager backend (v0.2 最小骨架)。

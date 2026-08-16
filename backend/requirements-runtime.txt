@@ -1,13 +1,11 @@
-# 后端运行时依赖(不含 ocr extra,OCR 走增强包)
-# 从 pyproject.toml [project.dependencies] 提取
+# 后端运行时依赖(从 pyproject.toml [project.dependencies] 提取)
 alembic>=1.14,<2
 celery>=5.4,<6
 fastapi>=0.115,<1
 httpx>=0.28,<1
-openpyxl>=3.1,<4
+patchright>=1.55.0,<2
 pwdlib[argon2]>=0.2,<1
 pyjwt>=2.10,<3
-python-multipart>=0.0.9,<1
 pydantic-settings>=2.7,<3
 sqlalchemy>=2.0,<3
 uvicorn[standard]>=0.34,<1

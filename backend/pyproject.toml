@@ -1,6 +1,6 @@
 [project]
 name = "media-manager-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "多平台浏览器自动化养号管理台后端（媒体矩阵 media-matrix）"
 requires-python = ">=3.11"
 dependencies = [
@@ -8,18 +8,12 @@ dependencies = [
   "celery>=5.4,<6",
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
-  "openpyxl>=3.1,<4",
+  "patchright>=1.55.0,<2",          # v0.2 反检测浏览器驱动
   "pwdlib[argon2]>=0.2,<1",
   "pyjwt>=2.10,<3",
   "pydantic-settings>=2.7,<3",
   "sqlalchemy>=2.0,<3",
   "uvicorn[standard]>=0.34,<1",
-]
-
-[project.optional-dependencies]
-ocr = [
-    "paddleocr>=3.7.0",
-    "paddlepaddle>=3.3.1",
 ]
 
 [dependency-groups]
