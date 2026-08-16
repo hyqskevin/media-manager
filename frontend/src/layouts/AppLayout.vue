@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import {
-  Avatar,
-  Calendar,
+  Cellphone,
   Connection,
   DataAnalysis,
-  Document,
   Expand,
   Fold,
-  List,
   Setting,
   SwitchButton,
   Timer,
@@ -15,6 +12,7 @@ import {
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import PlatformTabBar from '@/components/PlatformTabBar.vue'
 import { NAV_ITEMS, type SubItem, type TopItem } from '@/config/navPermissions'
 
 const route = useRoute()
@@ -44,14 +42,10 @@ const visibleNavItems = computed(() => NAV_ITEMS.filter(isTopVisible))
 
 /** 顶级菜单图标映射；新增顶级菜单时同步在这里登记 */
 const ICON_MAP: Record<string, unknown> = {
-  '/dashboard': DataAnalysis,
-  '/activities': Calendar,
-  '/duplicates': List,
-  '/tasks': Connection,
-  '/schedules': Timer,
-  '/reports': Document,
-  '/settings': Setting,
-  '/system-admin': Avatar,
+  '/accounts': DataAnalysis,
+  '/media-manage': Cellphone,
+  '/nurture': Timer,
+  '/admin': Setting,
 }
 
 function toggleCollapse() {
@@ -67,7 +61,7 @@ function logout(){localStorage.removeItem('token');userStore.clear();location.hr
     <ElAside class="app-sidebar" :width="isCollapse ? '64px' : '220px'">
       <div class="brand">
         <ElIcon :size="22"><Connection /></ElIcon>
-        <span v-if="!isCollapse">活动采集系统</span>
+        <span v-if="!isCollapse">media-manager</span>
       </div>
       <ElMenu router :default-active="route.fullPath" :collapse="isCollapse" :collapse-transition="false" class="app-menu">
         <template v-for="item in visibleNavItems" :key="item.index">
@@ -101,6 +95,7 @@ function logout(){localStorage.removeItem('token');userStore.clear();location.hr
         <div><ElTag type="success" effect="plain">本地轻量版</ElTag><ElButton text :icon="SwitchButton" @click="logout">退出</ElButton></div>
       </ElHeader>
       <ElMain class="app-main">
+        <PlatformTabBar />
         <RouterView />
       </ElMain>
     </ElContainer>

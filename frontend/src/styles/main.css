@@ -1,0 +1,134 @@
+/* ============================================
+ * Material Design 3 — media-manager v0.2
+ * 主色 #1976D2 (Material Blue 600)
+ * 见 docs/05-ui-design-system.md §1
+ * ============================================ */
+:root {
+  /* Primary */
+  --md-sys-color-primary: #1976D2;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: #D3E4FD;
+  --md-sys-color-on-primary-container: #001C38;
+
+  /* Secondary */
+  --md-sys-color-secondary: #535F70;
+  --md-sys-color-on-secondary: #FFFFFF;
+  --md-sys-color-secondary-container: #D7E3F8;
+  --md-sys-color-on-secondary-container: #101C2B;
+
+  /* Tertiary */
+  --md-sys-color-tertiary: #6B5778;
+  --md-sys-color-on-tertiary: #FFFFFF;
+  --md-sys-color-tertiary-container: #F2DAFF;
+  --md-sys-color-on-tertiary-container: #251431;
+
+  /* Error */
+  --md-sys-color-error: #BA1A1A;
+  --md-sys-color-on-error: #FFFFFF;
+  --md-sys-color-error-container: #FFDAD6;
+  --md-sys-color-on-error-container: #410002;
+
+  /* Background / Surface */
+  --md-sys-color-background: #FCFCFF;
+  --md-sys-color-on-background: #1A1C1E;
+  --md-sys-color-surface: #FCFCFF;
+  --md-sys-color-on-surface: #1A1C1E;
+  --md-sys-color-surface-variant: #DFE2EB;
+  --md-sys-color-on-surface-variant: #43474E;
+
+  /* Outline */
+  --md-sys-color-outline: #73777F;
+  --md-sys-color-outline-variant: #C3C7CF;
+
+  /* Inverse */
+  --md-sys-color-inverse-surface: #2F3033;
+  --md-sys-color-inverse-on-surface: #F1F0F4;
+  --md-sys-color-inverse-primary: #A3C9FF;
+
+  /* Status badges (§3.1) */
+  --md-status-success: #1B5E20;
+  --md-status-success-bg: #C8E6C9;
+  --md-status-warning: #E65100;
+  --md-status-warning-bg: #FFE0B2;
+  --md-status-error: #BA1A1A;
+  --md-status-error-bg: #FFDAD6;
+  --md-status-info: #1976D2;
+  --md-status-info-bg: #D3E4FD;
+
+  /* Type scale (subset used by v0.2) */
+  --md-sys-typescale-headline-medium: 500 28px/36px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+  --md-sys-typescale-headline-small: 500 24px/32px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+  --md-sys-typescale-title-large: 500 22px/28px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+  --md-sys-typescale-title-medium: 600 16px/24px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+  --md-sys-typescale-title-small: 600 14px/20px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+  --md-sys-typescale-body-large: 400 16px/24px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+  --md-sys-typescale-body-medium: 400 14px/20px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+  --md-sys-typescale-body-small: 400 12px/16px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+  --md-sys-typescale-label-large: 600 14px/20px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+  --md-sys-typescale-label-medium: 600 12px/16px 'Roboto', 'PingFang SC', system-ui, sans-serif;
+
+  /* Spacing (4dp grid) */
+  --md-sys-spacing-1: 4px;
+  --md-sys-spacing-2: 8px;
+  --md-sys-spacing-3: 12px;
+  --md-sys-spacing-4: 16px;
+  --md-sys-spacing-6: 24px;
+  --md-sys-spacing-8: 32px;
+  --md-sys-spacing-12: 48px;
+  --md-sys-spacing-16: 64px;
+
+  /* Shape */
+  --md-sys-shape-xs: 4px;
+  --md-sys-shape-sm: 8px;
+  --md-sys-shape-md: 12px;
+  --md-sys-shape-lg: 16px;
+  --md-sys-shape-xl: 28px;
+  --md-sys-shape-full: 9999px;
+
+  /* Elevation */
+  --md-sys-elevation-1: 0 1px 2px 0 rgba(0, 0, 0, 0.30), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-sys-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px 0 rgba(0, 0, 0, 0.30);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font: var(--md-sys-typescale-body-large);
+  color: var(--md-sys-color-on-background);
+  background: var(--md-sys-color-background);
+}
+
+.md-typescale-headline-medium { font: var(--md-sys-typescale-headline-medium); }
+.md-typescale-title-large { font: var(--md-sys-typescale-title-large); }
+.md-typescale-title-medium { font: var(--md-sys-typescale-title-medium); }
+.md-typescale-body-medium { font: var(--md-sys-typescale-body-medium); }
+.md-typescale-body-small { font: var(--md-sys-typescale-body-small); }
+
+.md-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-full);
+  font: var(--md-sys-typescale-label-medium);
+}
+.md-badge--success { color: var(--md-status-success); background: var(--md-status-success-bg); }
+.md-badge--warning { color: var(--md-status-warning); background: var(--md-status-warning-bg); }
+.md-badge--error { color: var(--md-status-error); background: var(--md-status-error-bg); }
+.md-badge--info { color: var(--md-status-info); background: var(--md-status-info-bg); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

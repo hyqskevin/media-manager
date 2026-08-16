@@ -13,7 +13,7 @@
 | 仓库路径 | `project/media-matrix/media-manager/` |
 | 当前版本 | **v0.2** |
 | 文档版本 | 2026-08-16 |
-| 文档状态 | 🟡 编写中（与工程并行 9 篇同步） |
+| 文档状态 | 🟡 编写中（9 篇主线文档 + 10 篇测试文档） |
 | 维护者 | docs-arch-agent |
 | 目标读者 | 新加入工程师 / 平台对接开发者 / 产品 / 测试 |
 
@@ -110,6 +110,7 @@ v0.2 **取消** `platform_accounts.platform` 这种「单表 + 平台字段」�
 - [API 契约](./07-api-contract.md)
 - [业务流程](./08-business-flows.md)
 - [非功能性需求](./09-non-functional.md)
+- [测试策略总览](./tests/README.md)（含 10 篇测试案例文档）
 
 ---
 

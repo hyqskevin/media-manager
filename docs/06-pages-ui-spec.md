@@ -6,6 +6,16 @@
 > 详细设计 token 见 `docs/05-ui-design-system.md`。
 > 详细 API 见 `docs/api-doc.md`（继承自 v0.1）；v0.2 新增端点以本文档为准。
 
+## 重写说明（2026-08-16）
+
+本次重写仅涉及养号相关 5 个页面（🟢 执行中 / 📜 历史 / ⏰ 定时任务 / 📑 动作集 / ⭐ 我的收藏夹）的「涉及 API」段和「数据源」段：
+
+- 数据库从单表（`platform_accounts` + `nurture_tasks` + `nurture_schedules` + `favorite_snapshots` + `nurture_action_sets` 共 19 张）改为每平台一张表（共 47 张），例如 `nurture_tasks_xiaohongshu` / `favorite_snapshots_xiaohongshu` / `nurture_action_sets_xiaohongshu` 等。
+- API 路径全部按平台分（`/api/v1/platforms/{platform}/...`）。
+- 收藏夹的 `items_json` 字段按平台特化（xhs 有 `note_id` / `red_id` / `xhs_specific`；weibo 有 `mblogid` / `weibo_specific` 等）。
+
+其他页面（账号列表 / 登录态 / 活跃度 / 风控 / 平台配置 / 通知 / 操作日志 / 操作员）**暂不重写**，等对应模块规格冻结后另行更新。本文档的视觉布局、字段说明、交互行为、异常状态、组件映射等其他段落保持原样。
+
 ---
 
 ## 0. 全局布局
@@ -583,15 +593,36 @@ POST  /api/v1/risk-config/reload  → 通知 Worker 重读
 - [详情] → 打开 Side Sheet 显示完整动作日志（每个动作的执行时间、结果）。
 - [+ 新建养号任务] → 弹 Dialog 选择账号、动作、时长、目标 URL。
 
-#### 6.4 涉及 API
+#### 6.4 涉及 API（按平台分路径）
 
-```
-GET    /api/v1/nurture/running                          → [NurtureTaskOut]
-POST   /api/v1/nurture                                  → 202 { task_id }
-POST   /api/v1/nurture/{task_id}/cancel                 → 204
-GET    /api/v1/nurture/{task_id}                        → NurtureTaskOut（带动作日志）
-GET    /api/v1/nurture/{task_id}/logs                   → [ActionLog]
-```
+**通用端点模板**：`/api/v1/platforms/{platform}/nurture-tasks...`
+
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/platforms/{platform}/nurture-tasks?status=running` | GET | 查询执行中任务（含排队） |
+| `/api/v1/platforms/{platform}/nurture-tasks` | POST | 启动养号 → 202 `{ task_id }` |
+| `/api/v1/platforms/{platform}/nurture-tasks/{id}` | GET | 任务详情（带动作日志） |
+| `/api/v1/platforms/{platform}/nurture-tasks/{id}/cancel` | POST | 取消任务 → 204 |
+| `/api/v1/platforms/{platform}/nurture-tasks/{id}/logs` | GET | 拉取动作日志 |
+| `/api/v1/platforms/{platform}/nurture-tasks/all/stop` | POST | 全部停止当前平台的运行任务 |
+
+**平台枚举**：
+- `xiaohongshu` / `weibo` / `douyin` / `zhihu` / `twitter` / `bilibili` / `xiaoyuzhou` / `wechat_official`
+
+**v0.2 实现状态**：
+- ✅ xiaohongshu：完整实现
+- ⏳ 其他 7 平台：返回 501 Not Implemented
+
+#### 数据源
+
+| 资源 | 表名 |
+| --- | --- |
+| 任务数据 | `nurture_tasks_xiaohongshu`（按 platform 切表，共 8 张） |
+| 账号数据 | `platform_accounts_xiaohongshu` |
+| 动作集 | `nurture_action_sets_xiaohongshu` |
+| Celery 任务追踪 | `nurture_tasks_xiaohongshu.celery_task_id` |
+
+> 表命名规则：`<资源>_<platform_code>`。`platform_code` 取 `xiaohongshu` / `weibo` / `douyin` / `zhihu` / `twitter` / `bilibili` / `xiaoyuzhou` / `wechat_official`。
 
 #### 6.5 异常状态
 
@@ -668,15 +699,33 @@ GET    /api/v1/nurture/{task_id}/logs                   → [ActionLog]
 - [📥 导出 CSV] → 触发下载，包含当前筛选条件下的所有任务。
 - 列头点击排序（task_id / started_at / duration）。
 
-#### 7.4 涉及 API
+#### 7.4 涉及 API（按平台分路径）
 
-```
-GET    /api/v1/nurture/history?from=&to=&platform=&account_id=&status=&q=&page=&page_size=
-POST   /api/v1/nurture/{task_id}/rerun
-DELETE /api/v1/nurture/{task_id}
-GET    /api/v1/nurture/{task_id}/logs
-GET    /api/v1/nurture/export?from=&to=  → CSV
-```
+**通用端点模板**：`/api/v1/platforms/{platform}/nurture-tasks...`
+
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/platforms/{platform}/nurture-tasks?status=...&from=&to=&account_id=&q=&page=&page_size=` | GET | 历史任务分页查询 |
+| `/api/v1/platforms/{platform}/nurture-tasks/{id}/rerun` | POST | 重跑历史任务 |
+| `/api/v1/platforms/{platform}/nurture-tasks/{id}` | DELETE | 删除历史记录 |
+| `/api/v1/platforms/{platform}/nurture-tasks/{id}/logs` | GET | 历史任务动作日志 |
+| `/api/v1/platforms/{platform}/nurture-tasks/export?from=&to=&format=csv` | GET | 导出 CSV |
+
+**平台枚举**：
+- `xiaohongshu` / `weibo` / `douyin` / `zhihu` / `twitter` / `bilibili` / `xiaoyuzhou` / `wechat_official`
+
+**v0.2 实现状态**：
+- ✅ xiaohongshu：完整实现
+- ⏳ 其他 7 平台：返回 501 Not Implemented
+
+#### 数据源
+
+| 资源 | 表名 |
+| --- | --- |
+| 任务数据 | `nurture_tasks_xiaohongshu`（按 platform 切表） |
+| 账号数据 | `platform_accounts_xiaohongshu` |
+| 动作集 | `nurture_action_sets_xiaohongshu` |
+| 关联收藏快照 | `favorite_snapshots_xiaohongshu`（按 snapshot_id 关联） |
 
 #### 7.5 异常状态
 
@@ -725,9 +774,41 @@ GET    /api/v1/nurture/export?from=&to=  → CSV
 
 > **v0.2 占位页**。不实现具体功能，仅 Roadmap 占位。v0.6 落地。
 
-#### 8.2 ~ 8.6 占位
+#### 8.2 ~ 8.6 占位（v0.2 重写）
 
-- 字段、交互、API、异常状态、组件映射 全部 v0.6 补充。
+> v0.2 起定时任务路径已按平台分，但具体 UI 仍为 v0.6 规划。下面列出已确定的 API 与数据源。
+
+#### 涉及 API（按平台分路径）
+
+**通用端点模板**：`/api/v1/platforms/{platform}/nurture-schedules...`
+
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/platforms/{platform}/nurture-schedules?enabled=true&page=&page_size=` | GET | 当前平台的定时计划列表 |
+| `/api/v1/platforms/{platform}/nurture-schedules` | POST | 新建定时计划（含 cron + 时长 + 动作集） |
+| `/api/v1/platforms/{platform}/nurture-schedules/{id}` | GET | 计划详情（含 cron + 下次运行时间） |
+| `/api/v1/platforms/{platform}/nurture-schedules/{id}` | PATCH | 修改 cron / 启用状态 |
+| `/api/v1/platforms/{platform}/nurture-schedules/{id}` | DELETE | 删除计划 |
+| `/api/v1/platforms/{platform}/nurture-schedules/{id}/enable` | POST | 启用计划 |
+| `/api/v1/platforms/{platform}/nurture-schedules/{id}/disable` | POST | 停用计划 |
+| `/api/v1/platforms/{platform}/nurture-schedules/{id}/trigger` | POST | 立即触发一次（手动跑） |
+
+**平台枚举**：
+- `xiaohongshu` / `weibo` / `douyin` / `zhihu` / `twitter` / `bilibili` / `xiaoyuzhou` / `wechat_official`
+
+**v0.2 实现状态**：
+- ✅ xiaohongshu：完整实现
+- ⏳ 其他 7 平台：返回 501 Not Implemented
+- 🚧 Celery Beat 计划 v0.6 上线，目前手动触发等价于「立即执行一次」
+
+#### 数据源
+
+| 资源 | 表名 |
+| --- | --- |
+| 计划数据 | `nurture_schedules_xiaohongshu`（按 platform 切表） |
+| 关联任务 | `nurture_tasks_xiaohongshu.triggered_by_schedule_id` |
+| 关联账号 | `platform_accounts_xiaohongshu` |
+| 关联动作集 | `nurture_action_sets_xiaohongshu` |
 
 ---
 
@@ -788,14 +869,33 @@ GET    /api/v1/nurture/export?from=&to=  → CSV
 - 勾选 like_post / favorite_post 时 Helper Text 提示 "需要提供 post_url"。
 - 删除前弹确认 Dialog（动作集被引用时不阻止删除，但提示"已用于 N 个历史任务"）。
 
-#### 9.4 涉及 API
+#### 9.4 涉及 API（按平台分路径）
 
-```
-GET    /api/v1/action-sets                  → [ActionSetOut]
-POST   /api/v1/action-sets                  → 201
-PATCH  /api/v1/action-sets/{id}             → 200
-DELETE /api/v1/action-sets/{id}             → 204
-```
+**通用端点模板**：`/api/v1/platforms/{platform}/action-sets...`
+
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/platforms/{platform}/action-sets` | GET | 当前平台的动作集列表 |
+| `/api/v1/platforms/{platform}/action-sets` | POST | 新建动作集 → 201 |
+| `/api/v1/platforms/{platform}/action-sets/{id}` | GET | 动作集详情 |
+| `/api/v1/platforms/{platform}/action-sets/{id}` | PATCH | 修改动作集 → 200 |
+| `/api/v1/platforms/{platform}/action-sets/{id}` | DELETE | 删除动作集 → 204 |
+| `/api/v1/platforms/{platform}/action-sets/{id}/clone` | POST | 复制到当前平台 |
+
+**平台枚举**：
+- `xiaohongshu` / `weibo` / `douyin` / `zhihu` / `twitter` / `bilibili` / `xiaoyuzhou` / `wechat_official`
+
+**v0.2 实现状态**：
+- ✅ xiaohongshu：完整实现
+- ⏳ 其他 7 平台：返回 501 Not Implemented
+
+#### 数据源
+
+| 资源 | 表名 |
+| --- | --- |
+| 动作集数据 | `nurture_action_sets_xiaohongshu`（按 platform 切表，共 8 张） |
+| 引用关系 | `nurture_tasks_xiaohongshu.action_set_id` → 任务里记录引用次数 |
+| 引用关系 | `nurture_schedules_xiaohongshu.action_set_id` → 定时计划里也引用 |
 
 #### 9.5 异常状态
 
@@ -878,15 +978,50 @@ DELETE /api/v1/action-sets/{id}             → 204
 - 排序：收藏时间↓/↑、作者、平台。
 - 多选（Shift+点击 或 checkbox）→ 顶部出现 Action Bar [对比] [导出] [取消]。
 
-#### 10.4 涉及 API
+#### 10.4 涉及 API（按平台分路径）
 
-```
-GET /api/v1/favorites?account_id=&platform=&q=&sort=&page=&page_size=
-    → { items: [FavoriteItemOut], total, has_more }
-GET /api/v1/favorites/compare?ids=1,2,3  → 对比视图数据
-GET /api/v1/favorites/snapshots?account_id=&from=&to=
-    → [FavoriteSnapshotOut]
-```
+**通用端点模板**：`/api/v1/platforms/{platform}/accounts/{account_id}/favorites...` + 跨平台快照
+
+| 端点 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/v1/platforms/{platform}/accounts/{account_id}/favorites?sort=captured_at&page=&page_size=` | GET | 收藏条目分页 → `{ items: [FavoriteItemOut], total, has_more }` |
+| `/api/v1/platforms/{platform}/accounts/{account_id}/favorites/refresh` | POST | 立即抓取收藏夹（异步） → 202 |
+| `/api/v1/platforms/{platform}/accounts/{account_id}/favorites/{favorite_id}` | GET | 单个收藏详情 |
+| `/api/v1/platforms/{platform}/accounts/{account_id}/favorites/stats?days=30` | GET | 收藏统计（按日 / 平台） |
+| `/api/v1/platforms/{platform}/accounts/{account_id}/favorites/export?format=xlsx` | GET | 导出收藏快照 |
+| `/api/v1/favorites/compare?ids=1,2,3` | GET | 跨平台对比视图数据（聚合，不分平台） |
+| `/api/v1/favorites/snapshots?account_id=&platform=&from=&to=` | GET | 跨平台快照列表（聚合） |
+
+**平台枚举**：
+- `xiaohongshu` / `weibo` / `douyin` / `zhihu` / `twitter` / `bilibili` / `xiaoyuzhou` / `wechat_official`
+
+**v0.2 实现状态**：
+- ✅ xiaohongshu：完整实现
+- ⏳ 其他 7 平台：返回 501 Not Implemented
+
+#### 数据源
+
+| 资源 | 表名 |
+| --- | --- |
+| 收藏快照 | `favorite_snapshots_xiaohongshu`（按 platform 切表，共 8 张） |
+| 关联账号 | `platform_accounts_xiaohongshu` |
+| 抓取任务源 | `nurture_tasks_xiaohongshu`（fetch_favorites 动作） |
+| items_json 字段结构 | xhs 专属（见下方） |
+
+**平台 items_json 字段差异**（按 platform_code 切表后字段特化）：
+
+| platform_code | items_json 关键字段 | items_json 平台特有子结构 |
+| --- | --- | --- |
+| `xiaohongshu` | `note_id`, `title`, `author`, `url`, `cover_url`, `liked_at` | `xhs_specific{ip_location, board_name, note_type}` |
+| `weibo` | `mblogid`, `title`, `author`, `url`, `cover_url`, `liked_at` | `weibo_specific{source, retweet_mblogid, has_video, pic_count}` |
+| `douyin` | `aweme_id`, `title`, `author`, `url`, `cover_url`, `liked_at` | `douyin_specific{music_id, is_live, video_duration_ms, share_url}` |
+| `zhihu` | `answer_id` / `article_id`, `title`, `author`, `url`, `liked_at` | `zhihu_specific{question_id, voteup_count, comment_count}` |
+| `twitter` | `tweet_id`, `text`, `author`, `url`, `liked_at` | `twitter_specific{retweet_count, like_count, lang, media_keys[]}` |
+| `bilibili` | `avid` / `bvid`, `title`, `author`, `url`, `cover_url`, `liked_at` | `bilibili_specific{tid, duration, pubdate, play_count}` |
+| `xiaoyuzhou` | `episode_id`, `title`, `podcast`, `url`, `cover_url`, `liked_at` | `xiaoyuzhou_specific{duration_ms, podcast_id, category}` |
+| `wechat_official` | `article_url`, `title`, `author`, `url`, `cover_url`, `liked_at` | `wechat_specific{appid, biz, fakeid, publish_at}` |
+
+> 收藏条目比较 (`/api/v1/favorites/compare`) 时，前端按 `platform_code` 路由到对应表的特有字段渲染。
 
 #### 10.5 异常状态
 
@@ -1223,27 +1358,46 @@ GET    /api/v1/platforms
 GET    /api/v1/platforms/{id}/health
 POST   /api/v1/platforms/{id}/test-method
 
-# —— 养号任务 ——
-POST   /api/v1/nurture
-GET    /api/v1/nurture/running
-GET    /api/v1/nurture/history
-GET    /api/v1/nurture/{task_id}
-POST   /api/v1/nurture/{task_id}/cancel
-POST   /api/v1/nurture/{task_id}/rerun
-DELETE /api/v1/nurture/{task_id}
-GET    /api/v1/nurture/{task_id}/logs
-GET    /api/v1/nurture/export
+# —— 养号任务（按平台分）——
+# 平台枚举：xiaohongshu / weibo / douyin / zhihu / twitter / bilibili / xiaoyuzhou / wechat_official
+# v0.2 仅 xiaohongshu 完整实现，其他 7 平台返回 501
+POST   /api/v1/platforms/{platform}/nurture-tasks
+GET    /api/v1/platforms/{platform}/nurture-tasks?status=running
+GET    /api/v1/platforms/{platform}/nurture-tasks?status=history&from=&to=
+GET    /api/v1/platforms/{platform}/nurture-tasks/{task_id}
+POST   /api/v1/platforms/{platform}/nurture-tasks/{task_id}/cancel
+POST   /api/v1/platforms/{platform}/nurture-tasks/{task_id}/rerun
+DELETE /api/v1/platforms/{platform}/nurture-tasks/{task_id}
+GET    /api/v1/platforms/{platform}/nurture-tasks/{task_id}/logs
+GET    /api/v1/platforms/{platform}/nurture-tasks/export?from=&to=
 
-# —— 动作集 ——
-GET    /api/v1/action-sets
-POST   /api/v1/action-sets
-PATCH  /api/v1/action-sets/{id}
-DELETE /api/v1/action-sets/{id}
+# —— 定时任务（按平台分）——
+POST   /api/v1/platforms/{platform}/nurture-schedules
+GET    /api/v1/platforms/{platform}/nurture-schedules?enabled=true
+GET    /api/v1/platforms/{platform}/nurture-schedules/{id}
+PATCH  /api/v1/platforms/{platform}/nurture-schedules/{id}
+DELETE /api/v1/platforms/{platform}/nurture-schedules/{id}
+POST   /api/v1/platforms/{platform}/nurture-schedules/{id}/enable
+POST   /api/v1/platforms/{platform}/nurture-schedules/{id}/disable
+POST   /api/v1/platforms/{platform}/nurture-schedules/{id}/trigger
 
-# —— 收藏夹 ——
-GET    /api/v1/favorites
-GET    /api/v1/favorites/compare
-GET    /api/v1/favorites/snapshots
+# —— 动作集（按平台分）——
+GET    /api/v1/platforms/{platform}/action-sets
+POST   /api/v1/platforms/{platform}/action-sets
+GET    /api/v1/platforms/{platform}/action-sets/{id}
+PATCH  /api/v1/platforms/{platform}/action-sets/{id}
+DELETE /api/v1/platforms/{platform}/action-sets/{id}
+POST   /api/v1/platforms/{platform}/action-sets/{id}/clone
+
+# —— 收藏夹（按平台分）——
+GET    /api/v1/platforms/{platform}/accounts/{account_id}/favorites
+POST   /api/v1/platforms/{platform}/accounts/{account_id}/favorites/refresh
+GET    /api/v1/platforms/{platform}/accounts/{account_id}/favorites/{favorite_id}
+GET    /api/v1/platforms/{platform}/accounts/{account_id}/favorites/stats?days=30
+GET    /api/v1/platforms/{platform}/accounts/{account_id}/favorites/export?format=xlsx
+# 跨平台聚合
+GET    /api/v1/favorites/compare?ids=1,2,3
+GET    /api/v1/favorites/snapshots?account_id=&platform=&from=&to=
 
 # —— 风控配置 ——
 GET    /api/v1/risk-config

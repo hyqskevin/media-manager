@@ -1,0 +1,13 @@
+/* 表格操作按钮样式 —— 统一 icon-only 按钮触控区 ≥ 48dp */
+.table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--md-sys-spacing-1);
+}
+.table-actions .md-touch-target {
+  min-width: 48px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

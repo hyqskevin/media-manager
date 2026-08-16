@@ -11,6 +11,16 @@ from app.core.config import get_settings
 from app.core.database import Base
 # v0.2 models (ensure all model classes are imported so Base.metadata includes them)
 from app.models import user, platform_account  # noqa: F401
+# v0.3 models (full features)
+from app.models import (  # noqa: F401
+    audit_log,
+    login_check_log,
+    notification,
+    nurture_action_set,
+    nurture_schedule,
+    nurture_task,
+    system_config,
+)
 
 configuration = context.config
 if configuration.config_file_name:
