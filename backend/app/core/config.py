@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     nurture_global_enabled: bool = False  # 默认关闭,强制显式开启
 
     # ── Celery ──
-    celery_broker_url: str = f"filesystem://{ROOT_DIR / 'celery_broker'}"
-    celery_result_backend: str = f"filesystem://{ROOT_DIR / 'celery_results'}"
+    celery_broker_url: str = "memory://"
+    celery_result_backend: str = "cache+memory://"
 
 
 _settings: Settings | None = None
