@@ -1,1 +1,1 @@
-"""media-manager backend (v0.2 最小骨架)。
+# media-manager backend (v0.2 minimal skeleton)

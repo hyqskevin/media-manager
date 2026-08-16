@@ -1,1 +1,1 @@
-"""核心配置 / 数据库 / 安全基础设施。
+# Core config / database / security infrastructure
