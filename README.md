@@ -1,7 +1,6 @@
 # media-manager · 多平台浏览器自动化养号管理台
 
 > 媒体矩阵（media-matrix）账号运营管理台：基于 OpenCLI 浏览器自动化，跨平台（小红书/微博等）养号，支持主动浏览、点赞收藏、收藏夹管理。
-> 本仓库从 `xhs-info-crawl` 继承而来，复用了其 OpenCLI 适配、Celery 任务、FastAPI + Vue3 管理台基建。
 
 ## v0 范围（2026-08-16 确认）
 
@@ -13,15 +12,11 @@
 
 **不在 v0 范围（v1 再做）：** 工作流 / 多平台发布 / 数据中心 / 素材库 / 内容日历 / 规则引擎 / 自研 Chrome 扩展。
 
-详细设计与数据模型见：
-- [docs/SPEC-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/SPEC-v0.md) — v0 精简规格
-- [docs/overview-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/overview-v0.md) — v0 总览
-- [docs/api-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/api-v0.md) — v0 API
-- [docs/database-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/database-v0.md) — v0 数据表
-- [docs/browser-bridge-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/browser-bridge-v0.md) — v0 浏览器自动化
-- [docs/ui-v0.md](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/ui-v0.md) — v0 UI
+**v0.2 当前目标：** 在 v0 基础上扩展为 **8 平台 × 多账号** 统一抽象，反检测三件套（Patchright + stealth.min.js + 真人行为随机化）。xhs-web 完整实现 + 7 平台 stub。
 
-> 完整基线（继承自 xhs-info-crawl + 上级 Operate 设计，含工作流 / 发布 / 数据中心等 v1 模块）见 [`docs/overview.md`](file:///Users/hanamaki_mac_mini/Documents/github/project/media-matrix/media-manager/docs/overview.md) 及同目录其他 `*-design.md`。
+详细设计见：
+- [`docs/superpowers/specs/2026-08-16-v02-account-management-design.md`](docs/superpowers/specs/2026-08-16-v02-account-management-design.md) — v0.2 设计 spec（本地保留）
+- [`docs/superpowers/plans/2026-08-16-v02-account-management.md`](docs/superpowers/plans/2026-08-16-v02-account-management.md) — v0.2 实施计划（本地保留）
 
 ## 核心能力
 
@@ -29,20 +24,21 @@
 - **自动养号行为**：模拟真人主动浏览平台页面（滚动 feed、停留时长随机化）
 - **点赞 / 收藏**：按配置对推文执行点赞、收藏操作
 - **收藏夹列表**：查看当前账号在各平台的收藏内容
-- **定时任务**：Celery beat 按计划自动执行养号行为（继承自 xhs-info-crawl）
+- **定时任务**：Celery beat 按计划自动执行养号行为
+- **反检测**：Patchright 替换 Playwright + stealth.min.js 注入 + 真人行为随机化
 
-## 技术栈（继承自 xhs-info-crawl）
+## 技术栈
 
 | 层 | 技术 |
-|---|---|
+| --- | --- |
 | 后端 | FastAPI + SQLAlchemy + Alembic + Celery + SQLite（一期） |
 | 前端 | Vue 3 + Vite + Element Plus + Pinia |
-| 浏览器自动化 | OpenCLI（`@jackwener/opencli`）+ Chrome（已登录态复用） |
+| 浏览器自动化 | OpenCLI（`@jackwener/opencli`）+ Chrome + **Patchright（v0.2 反检测）** |
 | 任务 | Celery worker + beat（本地 filesystem broker） |
 
 ## 快速开始
 
-需要本地装 `uv` + Node 22+ + Chrome + OpenCLI。
+需要本地装 `uv` + Node 22+ + Chrome + Patchright（v0.2）。
 
 ```bash
 git clone https://github.com/hyqskevin/media-manager.git
@@ -55,7 +51,7 @@ make init                     # 装依赖、建表、seed admin
 ```bash
 make dev-api      # uvicorn → http://127.0.0.1:8000
 make dev-worker   # celery worker (1 concurrency)
-make dev-beat      # celery beat
+make dev-beat     # celery beat
 make dev-web      # vite dev → http://127.0.0.1:5173
 ```
 
@@ -77,22 +73,28 @@ media-manager/
 │   ├── app/
 │   │   ├── api/v1/          ← HTTP endpoints
 │   │   ├── models/          ← SQLAlchemy ORM
-│   │   ├── services/        ← 业务服务（opencli 适配 / 养号行为 / 收藏夹等）
-│   │   ├── tasks/           ← Celery 任务
+│   │   ├── services/        ← 业务服务（opencli 适配 / 平台适配器 / 养号行为 / 收藏夹）
+│   │   │   └── platforms/   ← v0.2 PlatformAdapter 抽象 + 8 平台 registry
+│   │   ├── anti_detection/  ← v0.2 stealth.min.js + human 行为工具
+│   │   ├── tasks/           ← Celery 任务（含 nurture_account）
 │   │   └── core/            ← config / database / security
 │   ├── migrations/          ← Alembic 版本
 │   └── tests/               ← pytest
 ├── frontend/                ← Vue 3 + Vite + Element Plus + Pinia
-│   ├── src/views/           ← 管理台视图
-│   └── package.json
-├── docs/                    ← 设计 / specs / 路线图
-└── tests/                   ← E2E 测试案例（md）
+│   └── src/views/
+│       ├── admin/PlatformAccountsTab.vue   ← v0.2 平台账号管理
+│       └── NurtureTasksView.vue             ← v0.2 养号任务页
+├── docs/
+│   ├── TODO.md              ← 当前迭代待办（不入库）
+│   └── superpowers/         ← 本地设计 spec / plan（不入库）
+└── reference/
+    └── anti-detection-notes.md   ← v0.2 反检测配方
 ```
 
 ## 常用命令
 
 | 命令 | 作用 |
-|---|---|
+| --- | --- |
 | `make init` | 安装依赖、建表、seed admin |
 | `make dev-api` | 起 FastAPI (uvicorn) |
 | `make dev-worker` | 起 Celery worker |
@@ -102,6 +104,14 @@ media-manager/
 | `make create-admin` | 手动创建/重置 admin |
 | `make test` | 后端 + 前端测试 |
 | `make build` | 前端生产构建 |
+
+## v0.2 反检测配方
+
+详见 [`reference/anti-detection-notes.md`](reference/anti-detection-notes.md)。核心三件套：
+
+1. **Patchright**（Playwright 反检测 fork）
+2. **stealth.min.js**（puppeteer-extra evasions，每 context 注入）
+3. **真人行为随机化**（字符延迟 30-150ms、操作间隔 3-15s、页面停留 5-15s）
 
 ## 发版与 Release
 
