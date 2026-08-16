@@ -59,3 +59,7 @@ launcher/ui/src/__tests__/
 
 # CI 测试工作流(不跑测试)
 .github/workflows/ci.yml
+
+# v0.2 参考仓库目录(只保留 markdown 笔记,clone 仓库本地参考用)
+reference/*/
+!reference/*.md
