@@ -4,14 +4,20 @@ Single-account nurture orchestration:
 1. Load PlatformAccount
 2. Check global_enabled / account enabled / silent hour / quota
 3. Get adapter = registry.get(account.platform)
-4. Sequentially execute actions (3-15s interval between)
-5. Call adapter.fetch_favorites + write FavoriteSnapshot
+4. Sequentially execute actions via REAL browser automation (patchright)
+5. End with fetch_favorites → write FavoriteSnapshot (REAL items, not hard-coded [])
+
+Browser launching is isolated into `_run_browser_actions` so tests can monkeypatch
+it without needing a real Chromium binary.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 from app.anti_detection.policy import (
     is_silent_hour,
@@ -26,16 +32,37 @@ from app.models.platform_account import PlatformAccount, FavoriteSnapshot
 from app.models.nurture_task import NurtureTask, NurtureActionLog
 from app.models.notification import Notification
 from app.services.platforms import registry
+from app.services.platforms.base import FavoriteItem
 from app.anti_detection.human import human_pause
+from app.anti_detection.context import new_stealth_context
 
 logger = logging.getLogger(__name__)
 
 # Actions allowed in nurture (mapped to adapter methods)
 ALLOWED_ACTIONS: set[str] = {"browse_home", "like_post", "favorite_post", "fetch_favorites"}
 
+# Project-internal storage_state directory (AGENTS.md: never use /tmp)
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+STORAGE_DIR = ROOT_DIR / "data" / "storage_states"
+STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Map action -> adapter method name
+ACTION_TO_METHOD: dict[str, str] = {
+    "browse_home": "browse_home",
+    "like_post": "like_post",
+    "favorite_post": "favorite_post",
+    "fetch_favorites": "fetch_favorites",
+}
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _storage_state_path(session_name: str) -> Path | None:
+    """Resolve storage_state json path for a session. Returns None if missing."""
+    p = STORAGE_DIR / f"{session_name}.json"
+    return p if p.exists() else None
 
 
 def update_task(task_id: int | None, **fields) -> None:
@@ -86,6 +113,68 @@ def append_action_log(
         db.close()
 
 
+async def _run_adapter_actions_async(
+    adapter, storage_state: Path | None, actions: list[str],
+    post_url: str | None, duration_minutes: int, max_items: int,
+) -> list[FavoriteItem]:
+    """Real browser automation: launch patchright chromium, run actions sequentially,
+    return the favorites list (real, not hard-coded []).
+
+    Raises if any step fails fatally; per-action errors are caught by the caller.
+    """
+    # Lazy import to keep test env light (patchright not needed for unit tests)
+    from patchright.async_api import async_playwright  # noqa: PLC0415
+
+    favorites: list[FavoriteItem] = []
+    async with async_playwright() as p:
+        # Headless unless XHS_NURTURE_HEADED=1 (debug / visible browser)
+        headed = os.environ.get("XHS_NURTURE_HEADED") == "1"
+        browser = await p.chromium.launch(
+            headless=not headed,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--lang=zh-CN",
+                "--no-sandbox",
+            ],
+        )
+        context = await new_stealth_context(
+            browser,
+            storage_state=str(storage_state) if storage_state else None,
+            headless=not headed,
+        )
+        try:
+            for action in actions:
+                method_name = ACTION_TO_METHOD.get(action)
+                if not method_name:
+                    continue
+                method = getattr(adapter, method_name, None)
+                if method is None:
+                    logger.warning("Adapter %s missing method %s", adapter.platform, method_name)
+                    continue
+
+                if action == "browse_home":
+                    await method(context, duration_seconds=duration_minutes * 60 // max(len(actions), 1))
+                elif action in {"like_post", "favorite_post"}:
+                    if post_url:
+                        await method(context, post_url)
+                elif action == "fetch_favorites":
+                    favorites = await method(context, max_items=max_items)
+        finally:
+            await context.close()
+            await browser.close()
+    return favorites
+
+
+def _run_browser_actions(
+    adapter, storage_state: Path | None, actions: list[str],
+    post_url: str | None, duration_minutes: int, max_items: int,
+) -> list[FavoriteItem]:
+    """Synchronous wrapper around `_run_adapter_actions_async` for Celery worker."""
+    return asyncio.run(_run_adapter_actions_async(
+        adapter, storage_state, actions, post_url, duration_minutes, max_items,
+    ))
+
+
 @celery_app.task(name="nurture.run", bind=True, max_retries=0)
 def nurture_account_task(
     self,
@@ -95,23 +184,11 @@ def nurture_account_task(
     post_url: str | None = None,
     task_id: int | None = None,
 ) -> dict:
-    """Single-account nurture orchestration (Celery task).
-
-    Args:
-        account_id: PlatformAccount.id
-        actions: list of action names (subset of ALLOWED_ACTIONS)
-        duration_minutes: max duration (5-240)
-        post_url: required for like_post / favorite_post
-        task_id: NurtureTask.id to drive status transitions (real records)
-
-    Returns:
-        {"status": "completed|skipped|failed", ...}
-    """
+    """Single-account nurture orchestration (Celery task)."""
     settings = get_settings()
     if not settings.nurture_global_enabled:
         return {"status": "skipped", "reason": "global_disabled"}
 
-    # Validate actions
     actions = [a for a in actions if a in ALLOWED_ACTIONS]
     if not actions:
         update_task(task_id, status="skipped", finished_at=_now_utc())
@@ -128,19 +205,16 @@ def nurture_account_task(
             update_task(task_id, status="skipped", finished_at=_now_utc())
             return {"status": "skipped", "reason": "account_disabled"}
 
-        # Silent hour check
         if is_silent_hour(datetime.now(timezone.utc)):
             update_task(task_id, status="skipped", finished_at=_now_utc())
             return {"status": "skipped", "reason": "silent_hour"}
 
-        # Quota check (simplified: always under quota in v0.2)
         quota = account.daily_quota_seconds or MAX_DAILY_SECONDS
         used_today = 0  # TODO: read from Redis in v0.3
         if check_quota_exceeded(used_today, quota):
             update_task(task_id, status="skipped", finished_at=_now_utc())
             return {"status": "skipped", "reason": "quota_exceeded"}
 
-        # Get adapter
         adapter = registry.get(account.platform)
         if adapter is None:
             update_task(task_id, status="failed", error="platform_not_supported",
@@ -151,7 +225,9 @@ def nurture_account_task(
             update_task(task_id, status="skipped", finished_at=_now_utc())
             return {"status": "skipped", "reason": reason}
 
-        # Real record lifecycle: mark running + record planned actions
+        storage_state = _storage_state_path(account.session_name)
+
+        # Real record lifecycle
         now = _now_utc()
         update_task(
             task_id,
@@ -161,9 +237,9 @@ def nurture_account_task(
             progress_pct=10,
         )
         for seq, action in enumerate(actions):
-            append_action_log(task_id, action, seq, "completed")
+            append_action_log(task_id, action, seq, "running")
 
-        # Always end with fetch_favorites + write snapshot (so "我的收藏" is populated)
+        # REAL browser automation (this is the heart of the change)
         result = {
             "status": "completed",
             "account_id": account_id,
@@ -172,20 +248,41 @@ def nurture_account_task(
             "favorite_snapshot_id": None,
             "items_collected": 0,
         }
-        try:
-            # Real invocation would look like:
-            #   context = await new_stealth_context(browser, storage_state=...)
-            #   favorites = await adapter.fetch_favorites(context, max_items=100)
-            favorites: list = []  # browser automation is env-dependent; adapter tested separately
-            append_action_log(task_id, "fetch_favorites", len(actions), "completed")
+        favorites: list[FavoriteItem] = []
+        snapshot_error: str | None = None
 
+        try:
+            favorites = _run_browser_actions(
+                adapter=adapter,
+                storage_state=storage_state,
+                actions=actions,
+                post_url=post_url,
+                duration_minutes=duration_minutes,
+                max_items=100,
+            )
+        except Exception as e:
+            logger.exception("Browser automation failed")
+            snapshot_error = str(e)
+            update_task(
+                task_id, status="failed", error=str(e), finished_at=_now_utc()
+            )
+            return {"status": "failed", "error": str(e)}
+
+        # Mark each action as completed (or failed if snapshot_error)
+        for seq, action in enumerate(actions):
+            err = snapshot_error if action == "fetch_favorites" and snapshot_error else None
+            append_action_log(task_id, action, seq, "failed" if err else "completed",
+                              error=err)
+
+        # Persist REAL favorites to DB
+        try:
             snapshot = FavoriteSnapshot(
                 account_id=account.id,
                 platform=account.platform.value,
                 captured_at=_now_utc(),
                 item_count=len(favorites),
                 items_json=json.dumps([f.__dict__ for f in favorites]),
-                error=None,
+                error=snapshot_error,
             )
             db.add(snapshot)
             db.commit()

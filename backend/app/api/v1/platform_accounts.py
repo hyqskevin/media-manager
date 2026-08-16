@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -102,24 +103,69 @@ async def delete_platform_account(
 
 
 @router.post("/{account_id}/check-login", response_model=CheckLoginResultOut)
-async def check_login(
+def check_login(
     account_id: int,
     db: Db,
     _: Admin,
 ) -> CheckLoginResultOut:
-    """v0.2 simplified: report current DB login_status (no real browser launch; v0.3).
-    If the platform adapter is a stub, still echo the stored status.
+    """Real login check: launch stealth browser with stored storage_state and
+    invoke adapter.check_login(context). Updates DB login_status accordingly.
+
+    NOTE: this is a *synchronous* route so we can use asyncio.run; the request
+    blocks until the real browser finishes (typically 5-15s).
     """
+    import asyncio
+    from app.tasks.nurture_task import _storage_state_path  # noqa: PLC0415
+    from patchright.async_api import async_playwright  # noqa: PLC0415
+    from app.anti_detection.context import new_stealth_context  # noqa: PLC0415
+
     account = _get_account_or_404(db, account_id)
     adapter = registry.get(account.platform)
-    if adapter is not None and adapter.status == "stub":
+    if adapter is None:
+        raise HTTPException(status_code=400, detail="platform_not_supported")
+
+    if adapter.status == "stub":
+        # No real check; echo stored status (consistent with old behaviour for stubs)
         return CheckLoginResultOut(logged_in=account.login_status == "valid", error="")
-    # v0.2: no live check; reflect stored status
-    return CheckLoginResultOut(
-        logged_in=account.login_status == "valid",
-        user_id=account.platform_user_id or "",
-        error="" if account.login_status == "valid" else account.login_status,
-    )
+
+    storage_state = _storage_state_path(account.session_name)
+
+    async def _run() -> CheckLoginResultOut:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled",
+                      "--lang=zh-CN", "--no-sandbox"],
+            )
+            context = await new_stealth_context(
+                browser, storage_state=str(storage_state) if storage_state else None,
+                headless=True,
+            )
+            try:
+                result = await adapter.check_login(context)
+                return CheckLoginResultOut(
+                    logged_in=result.logged_in,
+                    user_id=result.user_id or account.platform_user_id or "",
+                    nickname=result.nickname or "",
+                    error=result.error or "",
+                )
+            finally:
+                await context.close()
+                await browser.close()
+
+    try:
+        out = asyncio.run(_run())
+    except Exception as e:
+        out = CheckLoginResultOut(logged_in=False, error=str(e))
+
+    # Persist result back to DB (login_status + platform_user_id if returned)
+    account.login_status = "valid" if out.logged_in else "cookie_invalid"
+    if out.user_id:
+        account.platform_user_id = out.user_id
+    account.last_login_check_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(account)
+    return out
 
 
 @router.post("/{account_id}/nurture", response_model=NurtureTaskCreated)

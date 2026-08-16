@@ -6,9 +6,10 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pwdlib import PasswordHash
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, get_db
 from app.models.user import User
 
 settings = get_settings()
@@ -42,8 +43,9 @@ def decode_token(token: str) -> dict:
 
 def get_current_user(
     token: Annotated[str | None, Depends(oauth2_scheme)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> User:
-    """FastAPI 依赖：从 JWT 解析当前用户。"""
+    """FastAPI 依赖：从 JWT 解析当前用户（复用请求级 db session）。"""
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_token")
     try:
@@ -51,12 +53,7 @@ def get_current_user(
     except jwt.PyJWTError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"invalid_token: {e}")
 
-    db = SessionLocal()
-    try:
-        user = db.get(User, int(payload["sub"]))
-    finally:
-        db.close()
-
+    user = db.get(User, int(payload["sub"]))
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
     return user

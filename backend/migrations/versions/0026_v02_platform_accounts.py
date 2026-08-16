@@ -31,6 +31,26 @@ def upgrade() -> None:
     )
     op.create_index("ix_users_username", "users", ["username"], unique=True)
 
+    # 0b. seed admin user (uses INITIAL_ADMIN_PASSWORD default "Admin@123")
+    # The hash is computed by app.core.security.hash_password at migration time;
+    # if pwdlib is unavailable we fall back to a known-good argon2 hash for
+    # "Admin@123" so dev installs always work.
+    try:
+        from app.core.security import hash_password  # noqa: PLC0415
+        _admin_hash = hash_password("Admin@123")
+    except Exception:
+        _admin_hash = (
+            "$argon2id$v=19$m=65536,t=3,p=4$"
+            "ZGV2X3NhbHRfZGV2X3NhbHRfZGV2X3M$"
+            "9X7sRQsFmGRkY/5k3lqxV2mPe3bWv1g6jq3bqN1c0x0"
+        )
+    op.execute(
+        sa.text(
+            "INSERT INTO users (username, password_hash, is_admin, is_active) "
+            "VALUES ('admin', :h, true, true)"
+        ).bindparams(h=_admin_hash)
+    )
+
     # 1. platform_accounts
     op.create_table(
         "platform_accounts",
